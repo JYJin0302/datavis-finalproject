@@ -1,14 +1,21 @@
 import { useState, useEffect, act } from 'react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer
+} from "recharts";
 
 import './App.css';
 
+function num2cig(number){ return number/22; }
 
 function App() {
 	// Define state variables.
-	const [items, setItems] = useState([]);
-	const [selectedItem, setSelectedItem] = useState(null);
-	const [selectedLabel, setSelectedLabel] = useState(null);
-	const [selectedPrediction, setSelectedPrediction] = useState(null);
+	const [monthItem, setmonthItem] = useState([]);
 	
 	useEffect(() => {
 		fetch('month_dust.json')
@@ -17,10 +24,7 @@ function App() {
 				// Print data into console for debugging.
 				console.log(jsonData);
 
-				// Save data items to state with opacity and sizeFactor.
-				setItems(jsonData.map(item => ({
-					...item, opacity: 0.5, sizeFactor: 1
-				})));
+				setmonthItem(jsonData);
 
 			})
 			.catch((error) => {
@@ -28,50 +32,39 @@ function App() {
 			});
 	}, []);
 
-	// useEffect(() => {
-	// 	// Update the state when selectedItem, selectedLabel, or selectedPrediction changes
-	// 	// selectedItem will always be double sized and opaque
-	// 	// for the rest, set opacity and sizeFactor based on selectedLabel and selectedPrediction
-		
-	// 	const updatedItems = items.map((item) => {
-	// 		let opacity = 0.5;
-	// 		let sizeFactor = 1;
-	// 		const activated = selectedItem !== null || selectedLabel !== null || selectedPrediction !== null;
-	// 		console.log("Actiavted: ", activated);
+	const CustomTooltip = ({ active, payload, label }) => {
+		if (active && payload && payload.length) {
+			const original = payload[0].value;
+			return (
+			<div style={{ background: '#fff', padding: 10, border: '1px solid #ccc' }}>
+				<p><strong>Name:</strong> {label}</p>
+				<p><strong>Original:</strong> {original}</p>
+				<p><strong>Adjusted:</strong> {original + 10}</p>
+			</div>
+			);
+		}
+		return null;
+	};
 
-	// 		if (!activated) {
-	// 			opacity = 0.5;
-	// 			sizeFactor = 1;
-	// 		}
-	// 		else if (item === selectedItem) {
-	// 			opacity = 1;
-	// 			sizeFactor = 2;
-	// 		}
-	// 		else {
-	// 			opacity = 0.8;
-	// 			if (selectedLabel !== null && item.true_label !== selectedLabel) {
-	// 				opacity = 0.1;
-	// 			}
-	// 			if (selectedPrediction !== null && item.predicted_label !== selectedPrediction) {
-	// 				opacity = 0.1;
-	// 			}
-	// 			if (selectedLabel === null && selectedPrediction === null) {
-	// 				opacity = 0.1;
-	// 			}
-	// 		}	
-
-	// 		return { ...item, opacity, sizeFactor };
-	// 	});
-	// 	setItems(updatedItems);
-
-	// }
-	// , [selectedItem, selectedLabel, selectedPrediction]);
-    
 	return (
-		<>
-
-
-		</>
+		<div style={{ width: "100%", height: 800 }}>
+			<h2 style={{ textAlign: "center" }}>Line Chart from JSON</h2>
+			<ResponsiveContainer>
+				<BarChart
+					data={monthItem}
+					margin={{ top: 20, right: 30, left: 50, bottom: 40 }}
+					layout='vertical'
+					barCategoryGap="30%"
+					barGap={10}
+				>
+					<CartesianGrid strokeDasharray="3 3" />
+					<YAxis type="category" dataKey={"분류"} angle={-30} textAnchor="end" interval={0} />
+					<XAxis type="number" />
+					<Tooltip formatter={(value) => num2cig(value)} content={<CustomTooltip />}/>
+					<Bar dataKey="2015년 1월" fill="#82ca9d" barSize={30} />
+				</BarChart>
+			</ResponsiveContainer>
+		</div>
 	);
 }
 export default App;
