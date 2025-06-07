@@ -233,10 +233,9 @@ function App() {
 				</ResponsiveContainer>
 
 				<div style={{ width: "100%", display: "flex", justifyContent: "center", alignItems: "center" }}>
-					<CylinderBar x={0} y={0} width={100} height={20} fill="#c28e00" />
-					<CylinderBar x={0} y={30} width={100} height={20} fill="#a87b00" />
-					<CylinderBar x={0} y={60} width={100} height={20} fill="#eeeeee" />
-					<CylinderBar x={0} y={90} width={100} height={20} fill="#EE7C02" />
+					
+					{/* FIX ME */}
+						
 				</div>
 			</div>
 		</div>
