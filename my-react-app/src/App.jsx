@@ -1,4 +1,4 @@
-import { useState, useEffect, act } from 'react';
+import { useState, useEffect, useRef, act } from 'react';
 import {
   BarChart,
   Bar,
@@ -12,13 +12,13 @@ import {
 
 import './App.css';
 
-function num2cig(number){ return number/22; }
-
 function App() {
 	// Define state variables.
 	const [monthItem, setmonthItem] = useState([]);
 	const [sortState, setSortState] = useState('default');
 	const [currentKeyIndex, setcurrentKeyIndex] = useState(0);
+	
+	const [autoPlay, setAutoPlay] = useState(false);
 
 	useEffect(() => {
 		fetch('month_dust.json')
@@ -26,6 +26,21 @@ function App() {
 			.then((jsonData) => {
 				// Print data into console for debugging.
 				console.log(jsonData);
+
+				// transform the NULL values to 0
+				jsonData.forEach(item => {
+					Object.keys(item).forEach(key => {
+						if (item[key] === null) {
+							item[key] = "0";
+						}
+						// if the value ends with "*" remove it
+						while (item[key].endsWith('*')) {
+							item[key] = item[key].slice(0, -1);
+						}
+					});
+				});
+
+				console.log("transformed", jsonData);
 
 				setmonthItem(jsonData.map((item, i) => ({
 					...item, startIndex : i,
@@ -45,13 +60,17 @@ function App() {
 			const value = item[keyValues[currentKeyIndex]];
 			keyValues.forEach(key => {
 				newItem['a'] = Math.min(3, value);
-				newItem['b'] = Math.min(5, value);
-				newItem['c'] = value - newItem['b'] - newItem['a'];
+				newItem['b'] = Math.min(1, value);
+				newItem['c'] = Math.min(1, value);
+				newItem['d'] = value - newItem['b'] - newItem['a'] - newItem['c'];
 			});
 
 			return newItem;
 		}))
-
+		
+		
+		console.log("currentKeyIndex", currentKeyIndex);
+		console.log("currentKey", keyValues[currentKeyIndex]);
 		console.log("update", monthItem);
 
 	}, [currentKeyIndex]);
@@ -62,7 +81,7 @@ function App() {
 			keyValues.push(`${y}년 ${m}월`);
 		}
 	}
-
+	
 
 	const handleSort = () => {
 		let sorted;
@@ -88,9 +107,33 @@ function App() {
 	const MonthSlider = () => {
 
 		const [selectedIndex, setSelectedIndex] = useState(currentKeyIndex);
+  		const intervalRef = useRef(null);
 		const handleChange = (e) => {
 			setSelectedIndex(Number(e.target.value));
 		};
+
+		const toggleAutoPlay = () => {
+			setAutoPlay(!autoPlay);
+		};
+
+		useEffect (() => {
+			setcurrentKeyIndex(selectedIndex);
+		}, [selectedIndex]);
+
+		useEffect(() => {
+			if (autoPlay) {
+			intervalRef.current = setInterval(() => {
+				setSelectedIndex((prevIndex) => {
+				const nextIndex = (prevIndex + 1) % keyValues.length;
+				return nextIndex;
+				});
+			}, 300); 
+			} else {
+				clearInterval(intervalRef.current);
+			}
+
+			return () => clearInterval(intervalRef.current); // cleanup
+		}, [autoPlay]);
 
 		const currentValue = keyValues[selectedIndex];
 		return (
@@ -107,6 +150,9 @@ function App() {
 				style={{ width: "100%" }}
 				onMouseUp={() => {setcurrentKeyIndex(selectedIndex)}}
 			/>
+			<button onClick={toggleAutoPlay}>
+			  {autoPlay ? "Stop Auto" : "Start Auto"}
+			</button>
 			</div>
 		);
 	};
@@ -114,22 +160,24 @@ function App() {
 
 	const CustomTooltip = ({ active, payload, label }) => {
 		if (active && payload && payload.length) {
-			const original = payload[0].value;
+			console.log("payload", payload);
+			const original = payload[0].payload[keyValues[currentKeyIndex]];
 			return (
 			<div style={{ background: '#fff', padding: 10, border: '1px solid #ccc' }}>
-				<p><strong>Name:</strong> {label}</p>
-				<p><strong>Original:</strong> {original}</p>
-				<p><strong>Adjusted:</strong> {original + 10}</p>
+				<p><strong>지역:</strong> {label}</p>
+				<p><strong>PM2.5 </strong> {original} μg/m³ </p>
+				<p><strong>간접 흡연량:</strong> 일 당 {(original/22).toFixed(2)} 개비</p>
 			</div>
 			);
 		}
 		return null;
 	};
 
+
 	const CylinderBar = ({ x, y, width, height, fill }) => (
 		<g>
 			<defs>
-			<linearGradient id="cylinderGradient" x1="0" y1="0" x2="0" y2="1">
+			<linearGradient id="hCylinderGradient" x1="0" y1="0" x2="1" y2="0">
 				<stop offset="0%" stopColor={fill} stopOpacity="0.8" />
 				<stop offset="50%" stopColor={fill} stopOpacity="1" />
 				<stop offset="100%" stopColor={fill} stopOpacity="0.8" />
@@ -140,9 +188,9 @@ function App() {
 			y={y}
 			width={width}
 			height={height}
-			rx={width / 2}  // ← round corners = pill shape
-			ry={width / 2}
-			fill="url(#cylinderGradient)"
+			rx={height / 2} // Rounded ends horizontally
+			ry={height / 2}
+			fill="url(#hCylinderGradient)"
 			/>
 		</g>
 	);
@@ -158,25 +206,39 @@ function App() {
 
 			<h2 style={{ textAlign: "center" }}>Line Chart from JSON</h2>
 			<MonthSlider>	</MonthSlider>
-			<ResponsiveContainer>
-				<BarChart
-					data={monthItem}
-					margin={{ top: 20, right: 30, left: 50, bottom: 40 }}
-					layout='vertical'
-					barCategoryGap="30%"
-					barGap={10}
-				>
-					<CartesianGrid strokeDasharray="3 3" />
-					<YAxis type="category" dataKey={"분류"} angle={-30} textAnchor="end" interval={0} />
-					<XAxis type="number" domain={[0, 50]} hide />
-					<Tooltip formatter={(value) => num2cig(value)} content={<CustomTooltip />}/>
-					<Bar dataKey={'a'} stackId="a" fill="#f8e4b3" radius={[10, 0, 0, 10]} shape={<CylinderBar />}/>
-					<Bar dataKey={'b'} stackId="a" fill="#f8e4b3" radius={[10, 0, 0, 10]} />
-  					<Bar dataKey={'c'} stackId="a" fill="#d26b26" radius={[0, 10, 10, 0]}>
-						<LabelList dataKey={keyValues[currentKeyIndex]} position="right" />
-					</Bar>
-				</BarChart>
-			</ResponsiveContainer>
+			<div className="content-container" style={{ width: "100%", height: 600, marginTop: 20, marginBottom: 20, display: "flex", flexDirection: "column", alignItems: "left" }}
+			>
+				<ResponsiveContainer width="60%" height="100%" >
+					<BarChart
+						data={monthItem}
+						margin={{ top: 20, right: 30, left: 50, bottom: 40 }}
+						layout='vertical'
+						barCategoryGap="30%"
+						barGap={10}
+						barSize={20}
+					>
+						<CartesianGrid strokeDasharray="3 3" />
+						<YAxis type="category" dataKey={"분류"} angle={-30} textAnchor="end" interval={0} />
+						<XAxis type="number" domain={[0, 50]} />
+						<Tooltip dataKey={keyValues[currentKeyIndex]} content={<CustomTooltip />}/>
+						
+						<Bar dataKey={'a'} stackId="a" fill="#c28e00" />
+						<Bar dataKey={'b'} stackId="a" fill="#a87b00" />
+						<Bar dataKey={'d'} stackId="a" fill="#eeeeee" />
+						<Bar dataKey={'c'} stackId="a" fill="#EE7C02" radius={[0, 10, 10, 0]}>
+							<LabelList dataKey={keyValues[currentKeyIndex]} position="right" />
+						</Bar>
+
+					</BarChart>
+				</ResponsiveContainer>
+
+				<div style={{ width: "100%", display: "flex", justifyContent: "center", alignItems: "center" }}>
+					<CylinderBar x={0} y={0} width={100} height={20} fill="#c28e00" />
+					<CylinderBar x={0} y={30} width={100} height={20} fill="#a87b00" />
+					<CylinderBar x={0} y={60} width={100} height={20} fill="#eeeeee" />
+					<CylinderBar x={0} y={90} width={100} height={20} fill="#EE7C02" />
+				</div>
+			</div>
 		</div>
 	);
 }
